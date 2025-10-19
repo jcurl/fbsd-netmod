@@ -1,0 +1,5 @@
+# Ignore backup files
+*~
+
+# Assuming we're building using a vpath type build
+/src/build
