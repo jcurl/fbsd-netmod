@@ -86,7 +86,7 @@ construct_packet(struct ifnet *ifp)
   eth_packet[ETH_DST_MAC_OFFSET + 3] = 0x00;
   eth_packet[ETH_DST_MAC_OFFSET + 4] = 0x00;
   eth_packet[ETH_DST_MAC_OFFSET + 5] = 0x01;
-  memcpy(eth_packet + ETH_SRC_MAC_OFFSET, IF_LLADDR(ifp), ETHER_ADDR_LEN);
+  memcpy(eth_packet + ETH_SRC_MAC_OFFSET, if_getlladdr(ifp), ETHER_ADDR_LEN);
   write_uint16(eth_packet + ETH_PROTO_OFFSET, htons(ETH_PROTO_IPV4));
 
   // IPv4 Header (20 bytes)
@@ -126,8 +126,8 @@ construct_packet(struct ifnet *ifp)
   m->m_len = ETHLEN;
   m->m_flags |= M_MCAST;
 
-  printf("%s hwassist = %08zx\n", ifp->if_xname, ifp->if_hwassist);
-  if (ifp->if_hwassist & CSUM_IP) {
+  printf("%s hwassist = %08x\n", if_name(ifp), if_gethwassist(ifp));
+  if (if_gethwassist(ifp) & CSUM_IP) {
     m->m_pkthdr.csum_flags |= CSUM_IP;
   } else {
     uint16_t ipcs = in_cksum_hdr((const struct ip*)(m->m_data + IPV4_OFFSET));
@@ -135,7 +135,7 @@ construct_packet(struct ifnet *ifp)
     write_uint16(ipv4hdr + IPV4HDR_CHECKSUM, ipcs);
   }
 
-  if (ifp->if_hwassist & CSUM_IP_UDP) {
+  if (if_gethwassist(ifp) & CSUM_IP_UDP) {
     m->m_pkthdr.csum_flags |= CSUM_IP_UDP;
     m->m_pkthdr.csum_data = UDP_CHECKSUM;
   } else {

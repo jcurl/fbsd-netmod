@@ -33,41 +33,16 @@ transmit(struct ifnet *ifp, struct mbuf *m)
 
   NET_EPOCH_ENTER(et);
   // Will free the mbuf for us.
-  int error = (*ifp->if_transmit)(ifp, m);
+#if __FreeBSD_version < 1403000
+  int error = ifp->if_transmit(ifp, m);
+#else
+  // Defined in ifnet(9) FreeBSD 14.3 and later.
+  int error = if_transmit(ifp, m);
+#endif
   if (error) {
     mod_printf("if_transmit returned %d\n", error);
   } else {
     mod_printf("if_transmit successful\n");
-  }
-  NET_EPOCH_EXIT(et);
-}
-
-static void
-transmit_ro(struct ifnet *ifp, struct mbuf *m)
-{
-  struct epoch_tracker et;
-  struct route ro;
-  struct sockaddr dst;
-
-  dst.sa_family = pseudo_AF_HDRCMPLT;
-  bcopy(mtod(m, const void *), dst.sa_data, ETHER_HDR_LEN);
-
-  m->m_pkthdr.len -= ETHER_HDR_LEN;
-  m->m_len -= ETHER_HDR_LEN;
-  m->m_data += ETHER_HDR_LEN;
-
-  bzero(&ro, sizeof(ro));
-  ro.ro_prepend = (u_char *)&dst.sa_data;
-  ro.ro_plen = ETHER_HDR_LEN;
-  ro.ro_flags = RT_HAS_HEADER;
-
-  NET_EPOCH_ENTER(et);
-  // Will free the mbuf for us.
-  int error = (*ifp->if_output)(ifp, m, &dst, &ro);
-  if (error) {
-    mod_printf("if_output returned %d\n", error);
-  } else {
-    mod_printf("if_output successful\n");
   }
   NET_EPOCH_EXIT(et);
 }
@@ -81,17 +56,17 @@ show_ifn(void)
     mod_printf("interface not found\n");
     return;
   } else {
-    mod_printf("%s found\n", ifp->if_xname);
+    mod_printf("%s found\n", if_name(ifp));
   }
 
-  if ((ifp->if_flags & IFF_UP) == 0) {
-    mod_printf("%s link down\n", ifp->if_xname);
+  if ((if_getflags(ifp) & IFF_UP) == 0) {
+    mod_printf("%s link down\n", if_name(ifp));
     return;
   }
 
   struct mbuf *m = construct_packet(ifp);
   if (m == NULL) {
-    mod_printf("%s mbuf alloc failed\n", ifp->if_xname);
+    mod_printf("%s mbuf alloc failed\n", if_name(ifp));
     return;
   }
 
@@ -105,11 +80,11 @@ showifn_link_event(void *arg, struct ifnet *ifp, int linkstate)
   if (ifp == NULL) return;
 
   if (linkstate == LINK_STATE_UP) {
-    mod_printf("interface %s link up\n", ifp->if_xname);
+    mod_printf("interface %s link up\n", if_name(ifp));
   } else if (linkstate == LINK_STATE_DOWN) {
-    mod_printf("interface %s link down\n", ifp->if_xname);
+    mod_printf("interface %s link down\n", if_name(ifp));
   } else {
-    mod_printf("interface %s has linkstate %d\n", ifp->if_xname, linkstate);
+    mod_printf("interface %s has linkstate %d\n", if_name(ifp), linkstate);
   }
 }
 
@@ -119,11 +94,11 @@ showifn_event(void *arg, struct ifnet *ifp, int event)
   if (ifp == NULL) return;
 
   if (event == IFNET_EVENT_DOWN) {
-    mod_printf("interface %s down\n", ifp->if_xname);
+    mod_printf("interface %s down\n", if_name(ifp));
   } else if (event == IFNET_EVENT_UP) {
-    mod_printf("interface %s up\n", ifp->if_xname);
+    mod_printf("interface %s up\n", if_name(ifp));
   } else {
-    mod_printf("interface %s event %d\n", ifp->if_xname, event);
+    mod_printf("interface %s event %d\n", if_name(ifp), event);
   }
 }
 
